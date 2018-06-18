@@ -259,6 +259,18 @@ public class WebSecurityTest {
 	@Test()
 	@WithMockUser(username = "Alan", roles = { "ADMIN" })
 	public void testAccessToPersonalCenterWithRoleAdmin() throws Exception {
+		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_USER)).andExpect(status().isOk());
+	}
+	
+	@Test()
+	@WithMockUser(username = "Alan", roles = { "OPERATOR" })
+	public void testAccessToPersonalCenterWithRoleOperator() throws Exception {
+		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_USER)).andExpect(status().isOk());
+	}
+	
+	@Test()
+	@WithMockUser(username = "Alan", roles = { "NONEXISTING" })
+	public void testAccessToPersonalCenterWithRoleNonexisting() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_USER)).andExpect(status().isForbidden());
 	}
 
@@ -303,6 +315,12 @@ public class WebSecurityTest {
 	@Test()
 	@WithMockUser(username = "Anna", roles = { "OPERATOR" })
 	public void testAccessToOperationCenterWithRoleOperator() throws Exception {
+		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_OPERATION)).andExpect(status().isOk());
+	}
+	
+	@Test()
+	@WithMockUser(username = "Anna", roles = { "ADMIN" })
+	public void testAccessToOperationCenterWithRoleAdmin() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_OPERATION)).andExpect(status().isOk());
 	}
 

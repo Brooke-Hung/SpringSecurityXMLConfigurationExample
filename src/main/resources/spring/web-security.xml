@@ -14,7 +14,7 @@
 	<context:component-scan base-package="com.springsecurity.demo" />
 
 	<http auto-config="false" use-expressions="true"
-		entry-point-ref="loginUrlAuthenticationEntryPoint">
+		access-decision-manager-ref="accessDecisionManager" entry-point-ref="loginUrlAuthenticationEntryPoint">
 		<intercept-url pattern="/account-management/saveAccount" access="hasAuthority('WRITE')" />
 		<intercept-url pattern="/personal-center/**" access="hasRole('USER')" />
 		<intercept-url pattern="/admin-console/**" access="hasRole('ADMIN')" />
@@ -45,6 +45,41 @@
 	<b:bean id="loginUrlAuthenticationEntryPoint"
 		class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
 		<b:constructor-arg value="/account-management/loginViaPassword" />
+	</b:bean>
+	
+	<!-- Role Hierarchy -->
+	<b:bean id="accessDecisionManager"
+		class="org.springframework.security.access.vote.AffirmativeBased">
+		<b:constructor-arg>
+			<b:list>
+				<b:ref bean="roleHierarchyVoter" />
+				<b:bean
+					class="org.springframework.security.web.access.expression.WebExpressionVoter">
+					<b:property name="expressionHandler">
+						<b:bean
+							class="org.springframework.security.web.access.expression.DefaultWebSecurityExpressionHandler">
+							<b:property name="roleHierarchy" ref="roleHierarchy" />
+						</b:bean>
+					</b:property>
+				</b:bean>
+				<b:bean class="org.springframework.security.access.vote.AuthenticatedVoter" />
+			</b:list>
+		</b:constructor-arg>
+	</b:bean>
+	
+	<b:bean id="roleHierarchyVoter"
+		class="org.springframework.security.access.vote.RoleHierarchyVoter">
+		<b:constructor-arg ref="roleHierarchy" />
+	</b:bean>
+	
+	<b:bean id="roleHierarchy"
+		class="org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl">
+		<b:property name="hierarchy">
+			<b:value>
+				ROLE_ADMIN > ROLE_OPERATOR
+				ROLE_OPERATOR > ROLE_USER
+			</b:value>
+		</b:property>
 	</b:bean>
 
 	<!-- Authentication -->
