@@ -1,0 +1,123 @@
+@CHARSET "UTF-8";
+
+body{
+
+	background-color:#FFFFFF;
+}
+
+a{
+	text-decoration: none;
+}
+
+.message, .error{
+	color: red;
+}
+
+form input
+{
+	width: 200px;
+	line-height: 36px;
+	padding: 0 10px;
+}
+
+/**
+ * Homepage
+ */
+.banner, .container, .top_nav
+{
+	width: 80%;
+	margin-right: auto;
+	margin-left: auto;
+}
+
+.top{
+	height: 212px;
+}
+
+.top_nav
+{
+	text-align: left;
+	cursor: pointer;	
+	line-height: 80px;
+	font-size: 24px;
+	background-image: url("images/menu-bg.jpg");
+}
+
+.top_nav a
+{
+	margin: 5px;
+	text-align: right;
+}
+
+.top_nav a:hover, .top_nav a.active
+{
+	color: red;
+}
+
+.top_nav span.user-auth
+{
+	float: right;
+}
+
+#logoutForm{
+	display:inline;
+}
+ 
+/**
+ * Account Management
+ */
+div.account-mgmt
+{
+	line-height: 35px;
+}
+
+div.account-mgmt form a
+{
+	margin: 0 5px;
+}
+
+div.account-mgmt .tab-list ul
+{
+	padding-left: 0px;
+	
+}
+ 
+div.account-mgmt .tab-list li
+{
+	display: inline-block;
+	margin: 5px 5px 5px 0;
+	cursor: pointer;
+	font-size: 20px;
+}
+
+div.account-mgmt .tab-list li.active
+{
+	color: red;
+}
+
+div.account-mgmt form
+{
+	border: 1px solid #EEEEEE;
+	padding: 15px 0;
+}
+
+div.account-mgmt form input[type="submit"]
+{
+	padding: 0;
+}
+
+div.account-mgmt form div
+{
+	padding: 5px 20px;
+}
+
+div.account-mgmt form input[type="checkbox"]
+{
+	width: 20px;
+	vertical-align: middle;
+}
+
+div.account-mgmt form span
+{
+	vertical-align: middle;
+}
