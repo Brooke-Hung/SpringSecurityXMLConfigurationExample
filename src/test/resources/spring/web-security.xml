@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<b:beans xmlns="http://www.springframework.org/schema/security"
+		 xmlns:b="http://www.springframework.org/schema/beans"
+		 xmlns:context="http://www.springframework.org/schema/context"
+		 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+		 xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd
+						http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd
+						http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd">
+	
+	<b:import resource="classpath:spring\persistence-application-context.xml"/>
+	
+	<context:property-placeholder location="classpath:spring/web-security.properties" ignore-unresolvable="true"/>
+	
+	<context:component-scan base-package="com.springsecurity.demo.service" />
+	
+	<!-- Mock UserDetailsService to eliminate database dependencies -->
+	<b:bean id="customUserDetailsService" class="org.mockito.Mockito" factory-method="mock">
+		<b:constructor-arg value="com.springsecurity.demo.security.userdetails.impl.CustomUserDetailsServiceImpl"/>
+	</b:bean>
+	
+	<!-- Since password is removed from UserDetails on successful login, add a dedicated UserDetailsService for RememberMeServices -->
+	<b:bean id="customUserDetailsServiceForRememberMeServices" class="org.mockito.Mockito" factory-method="mock">
+		<b:constructor-arg value="com.springsecurity.demo.security.userdetails.impl.CustomUserDetailsServiceImpl"/>
+	</b:bean>
+
+	<http auto-config="false" use-expressions="true"
+		access-decision-manager-ref="accessDecisionManager" entry-point-ref="loginUrlAuthenticationEntryPoint">
+		<intercept-url pattern="/account-management/saveAccount" access="hasAuthority('WRITE')" />
+		<intercept-url pattern="/personal-center/**" access="hasRole('USER')" />
+		<intercept-url pattern="/admin-console/**" access="hasRole('ADMIN')" />
+		<intercept-url pattern="/operation-center/**" access="hasRole('OPERATOR')" />
+		<intercept-url pattern="/account-management/login**" access="permitAll" /><!-- grant all users access to our log in page -->
+		<intercept-url pattern="/account-management/performLogin**" access="permitAll" /><!-- grant all users access to our log in actions -->
+		<intercept-url pattern="/" access="permitAll" /><!-- grant all users access to our homepage -->
+		<intercept-url pattern="/theme/**" access="permitAll" />
+		<intercept-url pattern="/**" access="isAuthenticated()" />
+		<logout logout-url="/account-management/logout"
+			success-handler-ref="cookieClearingLogoutSuccessHandler" />
+		<custom-filter position="FORM_LOGIN_FILTER" ref="customAuthenticationFilter" />
+		<custom-filter position="REMEMBER_ME_FILTER" ref="rememberMeFilter" />
+		<csrf disabled="false" />
+	</http>
+
+	<b:bean id="cookieClearingLogoutSuccessHandler"
+		class="com.springsecurity.demo.security.authentication.logout.CookieClearingLogoutSuccessHandler">
+		<b:constructor-arg>
+			<b:list>
+				<b:value>JSESSIONID</b:value>
+				<b:value>springdemoRememberMe</b:value>
+			</b:list>
+		</b:constructor-arg>
+		<b:constructor-arg value="/" />
+	</b:bean>
+
+	<b:bean id="loginUrlAuthenticationEntryPoint"
+		class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+		<b:constructor-arg value="/account-management/loginViaPassword" />
+	</b:bean>
+	
+	<!-- Role Hierarchy -->
+	<b:bean id="accessDecisionManager"
+		class="org.springframework.security.access.vote.AffirmativeBased">
+		<b:constructor-arg>
+			<b:list>
+				<b:ref bean="roleHierarchyVoter" />
+				<b:bean
+					class="org.springframework.security.web.access.expression.WebExpressionVoter">
+					<b:property name="expressionHandler">
+						<b:bean
+							class="org.springframework.security.web.access.expression.DefaultWebSecurityExpressionHandler">
+							<b:property name="roleHierarchy" ref="roleHierarchy" />
+						</b:bean>
+					</b:property>
+				</b:bean>
+				<b:bean class="org.springframework.security.access.vote.AuthenticatedVoter" />
+			</b:list>
+		</b:constructor-arg>
+	</b:bean>
+	
+	<b:bean id="roleHierarchyVoter"
+		class="org.springframework.security.access.vote.RoleHierarchyVoter">
+		<b:constructor-arg ref="roleHierarchy" />
+	</b:bean>
+	
+	<b:bean id="roleHierarchy"
+		class="org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl">
+		<b:property name="hierarchy">
+			<b:value>
+				ROLE_ADMIN > ROLE_OPERATOR
+				ROLE_OPERATOR > ROLE_USER
+			</b:value>
+		</b:property>
+	</b:bean>
+
+	<!-- Authentication -->
+	<b:bean id="customAuthenticationFilter"
+		class="com.springsecurity.demo.security.authentication.CustomAuthenticationFilter">
+		<b:property name="authenticationManager" ref="authenticationManager" />
+		<b:property name="rememberMeServices" ref="rememberMeServices" />
+
+		<b:property name="requiresAuthenticationRequestMatcher">
+			<b:bean
+				class="org.springframework.security.web.util.matcher.AntPathRequestMatcher">
+				<b:constructor-arg value="/account-management/performLogin*" />
+			</b:bean>
+		</b:property>
+
+		<b:property name="authenticationFailureHandler">
+			<b:bean
+				class="com.springsecurity.demo.security.authentication.CustomSimpleUrlAuthenticationFailureHandler" />
+		</b:property>
+
+		<b:property name="authenticationSuccessHandler">
+			<b:bean
+				class="com.springsecurity.demo.security.authentication.CustomSimpleUrlAuthenticationSuccessHandler" />
+		</b:property>
+	</b:bean>
+
+	<b:bean id="passwordEncoder"
+		class="org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder" />
+
+	<b:bean id="customAuthenticationProvider"
+		class="com.springsecurity.demo.security.authentication.CustomAuthenticationProvider" />
+
+	<authentication-manager alias="authenticationManager">
+		<authentication-provider ref="customAuthenticationProvider" />
+		<authentication-provider ref="rememberMeAuthenticationProvider" />
+	</authentication-manager>
+	
+	<!-- Remember Me -->
+	<b:bean id="rememberMeFilter"
+		class="org.springframework.security.web.authentication.rememberme.RememberMeAuthenticationFilter">
+		<b:constructor-arg ref="authenticationManager" />
+		<b:constructor-arg ref="rememberMeServices" />
+	</b:bean>
+	<b:bean id="rememberMeServices"
+		class="com.springsecurity.demo.security.authentication.rememberme.CustomRememberMeServices">
+		<b:constructor-arg value="springdemoRememberMe" />
+		<b:constructor-arg ref="customUserDetailsServiceForRememberMeServices" />
+		<b:property name="tokenValiditySeconds" value="604800" />
+		<b:property name="parameter" value="rememberMe" />
+		<b:property name="cookieName" value="springdemoRememberMe" />
+	</b:bean>
+
+	<b:bean id="rememberMeAuthenticationProvider"
+		class="org.springframework.security.authentication.RememberMeAuthenticationProvider">
+		<b:constructor-arg value="springdemoRememberMe" />
+	</b:bean>
+</b:beans>

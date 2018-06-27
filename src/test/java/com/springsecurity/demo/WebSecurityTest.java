@@ -11,11 +11,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.Arrays;
+import java.util.List;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.MockitoAnnotations;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ContextConfiguration;
@@ -25,7 +29,11 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import com.springsecurity.demo.constants.AccountStatus;
 import com.springsecurity.demo.constants.AuthenticationType;
+import com.springsecurity.demo.security.core.CustomGrantedAuthority;
+import com.springsecurity.demo.security.userdetails.CustomUserDetails;
+import com.springsecurity.demo.security.userdetails.CustomUserDetailsService;
 
 /**
  * @author Brooke
@@ -58,12 +66,8 @@ public class WebSecurityTest {
 	private static final String PARAM_CELLPHONE_NO = "cellphoneNo";
 	private static final String PARAM_VERIFICATION_CODE = "verificationCode";
 	private static final String PARAM_REMEMBER_ME = "rememberMe";
-	private static final String USER_USER_NAME = "MichaelJackson";
-	private static final String USER_PASSWORD = "hello";
-	private static final String ADMIN_USER_NAME = "TaylorSwift";
-	private static final String ADMIN_PASSWORD = "hello";
-	private static final String OPERATOR_USER_NAME = "SarahBrightman";
-	private static final String OPERATOR_PASSWORD = "password";
+	private static final String USER_NAME = "MichaelJackson";
+	private static final String PASSWORD = "hello";
 	private static final String AUTHENTICATION_TYPE_VIA_PASSWORD = String
 			.valueOf(AuthenticationType.VIA_PASSWORD.getTypeId());
 	private static final String AUTHENTICATION_TYPE_VIA_VERIFICATION_CODE = String
@@ -73,15 +77,32 @@ public class WebSecurityTest {
 	private static final String REMEMBER_ME_DISABLED = "false";
 	private static final String REMEMBER_ME_ENABLED = "true";
 	private static final String INVALID_VALUE = "Invalid";
+	private static final Integer ACCOUNT_ID = 1;
+	private static final String FIRST_NAME = "Alan";
+	private static final String LAST_NAME = "Su";
+	private static final String EMAIL = "test@test.com";
+	private static final String ROLE_USER = "ROLE_USER";
+	private static final String ROLE_ADMIN = "ROLE_ADMIN";
+	private static final String ROLE_OPERATOR = "ROLE_OPERATOR";
 
 	@Autowired
 	private WebApplicationContext wac;
 
 	private MockMvc mockMvc;
+	
+	@Autowired
+	private CustomUserDetailsService customUserDetailsService;
+	
+	@Autowired
+	private CustomUserDetailsService customUserDetailsServiceForRememberMeServices;
+	
+	@Autowired
+	private PasswordEncoder passwordEncoder;
 
 	@Before
 	public void setup() {
-		MockitoAnnotations.initMocks(this);
+		Mockito.reset(customUserDetailsService);
+		Mockito.reset(customUserDetailsServiceForRememberMeServices);
 		this.mockMvc = MockMvcBuilders.webAppContextSetup(this.wac).apply(springSecurity()).build();
 	}
 
@@ -94,40 +115,44 @@ public class WebSecurityTest {
 	// login via password
 	@Test()
 	public void testLoginViaPasswordWithRoleUser() throws Exception {
+		mockUser(AuthenticationType.VIA_PASSWORD);
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_PASSWORD)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_PASSWORD)
-						.param(PARAM_USER_NAME, USER_USER_NAME).param(PARAM_PASSWORD, USER_PASSWORD)
+						.param(PARAM_USER_NAME, USER_NAME).param(PARAM_PASSWORD, PASSWORD)
 						.param(PARAM_REMEMBER_ME, REMEMBER_ME_DISABLED).with(csrf()))
 				.andExpect(authenticated()).andExpect(redirectedUrl(DEFAULT_VIEW_FOR_USER));
 	}
 
 	@Test()
 	public void testLoginViaPasswordWithRoleAdmin() throws Exception {
+		mockAdmin(AuthenticationType.VIA_PASSWORD);
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_PASSWORD)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_PASSWORD)
-						.param(PARAM_USER_NAME, ADMIN_USER_NAME).param(PARAM_PASSWORD, ADMIN_PASSWORD)
+						.param(PARAM_USER_NAME, USER_NAME).param(PARAM_PASSWORD, PASSWORD)
 						.param(PARAM_REMEMBER_ME, REMEMBER_ME_DISABLED).with(csrf()))
 				.andExpect(authenticated()).andExpect(redirectedUrl(DEFAULT_VIEW_FOR_ADMIN));
 	}
 
 	@Test()
 	public void testLoginViaPasswordWithRoleOperator() throws Exception {
+		mockOperator(AuthenticationType.VIA_PASSWORD);
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_PASSWORD)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_PASSWORD)
-						.param(PARAM_USER_NAME, OPERATOR_USER_NAME).param(PARAM_PASSWORD, OPERATOR_PASSWORD)
+						.param(PARAM_USER_NAME, USER_NAME).param(PARAM_PASSWORD, PASSWORD)
 						.param(PARAM_REMEMBER_ME, REMEMBER_ME_DISABLED).with(csrf()))
 				.andExpect(authenticated()).andExpect(redirectedUrl(DEFAULT_VIEW_FOR_OPERATION));
 	}
 
 	@Test()
 	public void testLoginViaPasswordWithRememberMeEnabled() throws Exception {
+		mockUser(AuthenticationType.VIA_PASSWORD);
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_PASSWORD)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_PASSWORD)
-						.param(PARAM_USER_NAME, USER_USER_NAME).param(PARAM_PASSWORD, USER_PASSWORD)
+						.param(PARAM_USER_NAME, USER_NAME).param(PARAM_PASSWORD, PASSWORD)
 						.param(PARAM_REMEMBER_ME, REMEMBER_ME_ENABLED).with(csrf()))
 				.andExpect(authenticated()).andExpect(cookie().exists(COOKIE_NAME_FOR_REMEMBER_ME))
 				.andExpect(cookie().maxAge(COOKIE_NAME_FOR_REMEMBER_ME, COOKIE_MAX_AGE));
@@ -138,7 +163,7 @@ public class WebSecurityTest {
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_PASSWORD)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_PASSWORD)
-						.param(PARAM_USER_NAME, USER_USER_NAME).param(PARAM_PASSWORD, USER_PASSWORD)
+						.param(PARAM_USER_NAME, USER_NAME).param(PARAM_PASSWORD, PASSWORD)
 						.param(PARAM_REMEMBER_ME, REMEMBER_ME_DISABLED).with(csrf().useInvalidToken()))
 				.andExpect(status().isForbidden()).andExpect(unauthenticated());
 	}
@@ -148,7 +173,7 @@ public class WebSecurityTest {
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_PASSWORD)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_PASSWORD)
-						.param(PARAM_USER_NAME, USER_USER_NAME).param(PARAM_PASSWORD, INVALID_VALUE)
+						.param(PARAM_USER_NAME, USER_NAME).param(PARAM_PASSWORD, INVALID_VALUE)
 						.param(PARAM_REMEMBER_ME, REMEMBER_ME_DISABLED).with(csrf()))
 				.andExpect(status().isFound()).andExpect(unauthenticated())
 				.andExpect(redirectedUrl(VIEW_LOGIN_FAILURE_VIA_PASSWORD));
@@ -159,7 +184,7 @@ public class WebSecurityTest {
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_PASSWORD)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_PASSWORD)
-						.param(PARAM_USER_NAME, INVALID_VALUE).param(PARAM_PASSWORD, USER_PASSWORD)
+						.param(PARAM_USER_NAME, INVALID_VALUE).param(PARAM_PASSWORD, PASSWORD)
 						.param(PARAM_REMEMBER_ME, REMEMBER_ME_DISABLED).with(csrf()))
 				.andExpect(status().isFound()).andExpect(unauthenticated())
 				.andExpect(redirectedUrl(VIEW_LOGIN_FAILURE_VIA_PASSWORD));
@@ -168,13 +193,14 @@ public class WebSecurityTest {
 	@Test(expected = IllegalArgumentException.class)
 	public void testLoginViaPasswordWithInvalidAuthenticationType() throws Exception {
 		this.mockMvc.perform(post(ACTION_PERFORM_LOGIN_VIA_PASSWORD).param(PARAM_AUTHENTICATION_TYPE, INVALID_VALUE)
-				.param(PARAM_USER_NAME, USER_USER_NAME).param(PARAM_PASSWORD, USER_PASSWORD)
+				.param(PARAM_USER_NAME, USER_NAME).param(PARAM_PASSWORD, PASSWORD)
 				.param(PARAM_REMEMBER_ME, REMEMBER_ME_DISABLED).with(csrf()));
 	}
 
 	// login via verification code
 	@Test()
 	public void testLoginViaVerificationCodeWithValidCSRFToken() throws Exception {
+		mockUser(AuthenticationType.VIA_VERIFICATION_CODE);
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_VERIFICATION_CODE)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_VERIFICATION_CODE)
@@ -185,12 +211,13 @@ public class WebSecurityTest {
 
 	@Test()
 	public void testLoginViaVerificationCodeWithRememberMeEnabled() throws Exception {
+		mockUser(AuthenticationType.VIA_VERIFICATION_CODE);
 		this.mockMvc
 				.perform(post(ACTION_PERFORM_LOGIN_VIA_VERIFICATION_CODE)
 						.param(PARAM_AUTHENTICATION_TYPE, AUTHENTICATION_TYPE_VIA_VERIFICATION_CODE)
 						.param(PARAM_CELLPHONE_NO, CELLPHONE_NO).param(PARAM_VERIFICATION_CODE, VERIFICATION_CODE)
 						.param(PARAM_REMEMBER_ME, REMEMBER_ME_ENABLED).with(csrf()))
-				.andExpect(cookie().maxAge(COOKIE_NAME_FOR_REMEMBER_ME, COOKIE_MAX_AGE));
+				.andExpect(authenticated()).andExpect(cookie().maxAge(COOKIE_NAME_FOR_REMEMBER_ME, COOKIE_MAX_AGE));
 	}
 
 	@Test()
@@ -251,25 +278,25 @@ public class WebSecurityTest {
 	 */
 
 	@Test()
-	@WithMockUser(username = "Alan", roles = { "USER" })
+	@WithMockUser
 	public void testAccessToPersonalCenterWithRoleUser() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_USER)).andExpect(status().isOk());
 	}
 
 	@Test()
-	@WithMockUser(username = "Alan", roles = { "ADMIN" })
+	@WithMockAdmin
 	public void testAccessToPersonalCenterWithRoleAdmin() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_USER)).andExpect(status().isOk());
 	}
 	
 	@Test()
-	@WithMockUser(username = "Alan", roles = { "OPERATOR" })
+	@WithMockOperator
 	public void testAccessToPersonalCenterWithRoleOperator() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_USER)).andExpect(status().isOk());
 	}
 	
 	@Test()
-	@WithMockUser(username = "Alan", roles = { "NONEXISTING" })
+	@WithMockNonExisting
 	public void testAccessToPersonalCenterWithRoleNonexisting() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_USER)).andExpect(status().isForbidden());
 	}
@@ -282,25 +309,25 @@ public class WebSecurityTest {
 	}
 
 	@Test()
-	@WithMockUser(username = "Alan", roles = { "USER" })
+	@WithMockUser
 	public void testAccessToSaveAccountWithRoleUser() throws Exception {
 		this.mockMvc.perform(get(VIEW_SAVE_ACCOUNT)).andExpect(status().isForbidden());
 	}
 
 	@Test()
-	@WithMockUser(username = "Alan", authorities = { "WRITE" })
+	@WithWriteAuthority
 	public void testAccessToSaveAccountWithAuthorityWrite() throws Exception {
 		this.mockMvc.perform(get(VIEW_SAVE_ACCOUNT)).andExpect(status().isOk());
 	}
 
 	@Test()
-	@WithMockUser(username = "Alex", roles = { "ADMIN" })
+	@WithMockAdmin
 	public void testAccessToAdminConsoleWithRoleAdmin() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_ADMIN)).andExpect(status().isOk());
 	}
 
 	@Test()
-	@WithMockUser(username = "Alex", roles = { "USER" })
+	@WithMockUser
 	public void testAccessToAdminConsoleWithRoleUser() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_ADMIN)).andExpect(status().isForbidden());
 	}
@@ -313,19 +340,19 @@ public class WebSecurityTest {
 	}
 
 	@Test()
-	@WithMockUser(username = "Anna", roles = { "OPERATOR" })
+	@WithMockOperator
 	public void testAccessToOperationCenterWithRoleOperator() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_OPERATION)).andExpect(status().isOk());
 	}
 	
 	@Test()
-	@WithMockUser(username = "Anna", roles = { "ADMIN" })
+	@WithMockAdmin
 	public void testAccessToOperationCenterWithRoleAdmin() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_OPERATION)).andExpect(status().isOk());
 	}
 
 	@Test()
-	@WithMockUser(username = "Anna", roles = { "USER" })
+	@WithMockUser
 	public void testAccessToOperationCenterWithRoleUser() throws Exception {
 		this.mockMvc.perform(get(DEFAULT_VIEW_FOR_OPERATION)).andExpect(status().isForbidden());
 	}
@@ -337,4 +364,31 @@ public class WebSecurityTest {
 				.andExpect(redirectedUrl(VIEW_DEFAULT_LOGIN));
 	}
 
+	private void mockUserDetails(String roleName, AuthenticationType authenticationType) {
+		List<CustomGrantedAuthority> authorities = Arrays
+				.asList(new CustomGrantedAuthority[] { new CustomGrantedAuthority(roleName) });
+		CustomUserDetails customUserDetails = new CustomUserDetails(authenticationType, ACCOUNT_ID, FIRST_NAME,
+				LAST_NAME, EMAIL, CELLPHONE_NO, AccountStatus.IN_USE.getStatusId(), USER_NAME,
+				passwordEncoder.encode(PASSWORD), authorities);
+		CustomUserDetails customUserDetailsForRememberMeServices = new CustomUserDetails(authenticationType, ACCOUNT_ID,
+				FIRST_NAME, LAST_NAME, EMAIL, CELLPHONE_NO, AccountStatus.IN_USE.getStatusId(), USER_NAME,
+				passwordEncoder.encode(PASSWORD), authorities);
+		Mockito.when(customUserDetailsService.loadUserByUserNameOrCellphoneNo(Mockito.anyString(),
+				Mockito.any(AuthenticationType.class))).thenReturn(customUserDetails);
+		Mockito.when(customUserDetailsServiceForRememberMeServices.loadUserByUserNameOrCellphoneNo(Mockito.anyString(),
+				Mockito.any(AuthenticationType.class))).thenReturn(customUserDetailsForRememberMeServices);
+	}
+	
+	private void mockUser(AuthenticationType authenticationType){
+		mockUserDetails(ROLE_USER, authenticationType);
+	}
+	
+	private void mockAdmin(AuthenticationType authenticationType){
+		mockUserDetails(ROLE_ADMIN, authenticationType);
+	}
+	
+	private void mockOperator(AuthenticationType authenticationType){
+		mockUserDetails(ROLE_OPERATOR, authenticationType);
+	}
+	
 }

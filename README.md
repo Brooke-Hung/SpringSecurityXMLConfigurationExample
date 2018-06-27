@@ -9,7 +9,6 @@ Demonstrates use of adding authentication and authorization to web application u
 2.	CSRF protection.
 3.	Remember-me authentication.
 4.	Role-based authorization and authority-base authorization.
-5.	JUnit test with an embedded HSQL database.
 
 ## How to compile?
 ```
